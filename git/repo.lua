@@ -71,8 +71,8 @@ function Repo:tree(sha)
 end
 
 function new(dir)
-	if not dir:match('%.git/?$') then
-		dir = dir .. '.git'
+	if not dir:match('%.git.?$') then
+		dir = join_path(dir, '.git')
 	end
 	return setmetatable({
 		dir = dir
