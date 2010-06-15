@@ -1,6 +1,7 @@
 local join_path = git.util.join_path
 local decompressed = git.util.decompressed
 local read_until_nul = git.util.read_until_nul
+local to_hex = git.util.to_hex
 
 module(..., package.seeall)
 
@@ -32,7 +33,7 @@ function Repo:commit(sha)
 	local f, len, typ = self:raw_object(sha)
 	assert(typ == 'commit', string.format('%s (%s) is not a commit', sha, typ))
 
-	local commit = { repo = self, parents = {} }
+	local commit = { id = sha, repo = self, stored = true, parents = {} }
 	repeat
 		local line = f:read()
 		if not line then break end
@@ -63,12 +64,31 @@ function Repo:tree(sha)
 	local f, len, typ = self:raw_object(sha)
 	assert(typ == 'tree', string.format('%s (%s) is not a tree', sha, typ))
 
-	local tree = { repo = self }
+	local tree = { id = sha, repo = self, stored = true, _entries = {} }
 
-	-- TODO fill tree with files/directories
+	while true do
+		local info = read_until_nul(f)
+		if not info then break end
+		local entry_sha = to_hex(f:read(20))
+		local mode, name = info:match('^(%d+)%s(.+)$')
+		local entry_type = mode == '40000' and 'tree' or 'blob'
+		tree._entries[name] = { mode = mode, id = entry_sha, type = entry_type }
+	end
 
 	return setmetatable(tree, git.objects.Tree)
 end
+
+function Repo:blob(sha)
+	local f, len, typ = self:raw_object(sha)
+	f:close() -- can be reopened in Blob:content()
+
+	assert(typ == 'blob', string.format('%s (%s) is not a blob', sha, typ))
+
+	local blob = { id = sha, len = len, repo = self, stored = true }
+
+	return setmetatable(blob, git.objects.Blob)
+end
+
 
 function new(dir)
 	if not dir:match('%.git.?$') then

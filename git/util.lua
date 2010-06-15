@@ -35,17 +35,21 @@ function read_until_nul(f)
 		local c = f:read(1)
 		if c and c ~= '\0' then t[#t+1] = c end
 	until not c or c == '\0'
-	return table.concat(t)
+	if #t > 0 then
+		return table.concat(t)
+	else
+		return nil
+	end
 end
 
 function to_hex(s)
-	return s:gsub('.', function(c)
+	return (s:gsub('.', function(c)
 		return string.format('%02x', string.byte(c))
-	end)
+	end))
 end
 
 function from_hex(s)
-	return s:gsub('..', function(cc)
+	return (s:gsub('..', function(cc)
 		return string.char(tonumber(cc, 16))
-	end)
+	end))
 end
