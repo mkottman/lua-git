@@ -1,9 +1,8 @@
 require 'git'
 
-local commit = 'aa01735fd4b206ee1e83c2290e9283b564198aa2'
-
 local r = git.repo.new('.')
-local c = r:commit(commit)
+
+local c = r:head()
 
 print('Commit', commit)
 print(c.author)

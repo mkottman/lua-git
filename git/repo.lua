@@ -89,13 +89,35 @@ function Repo:blob(sha)
 	return setmetatable(blob, git.objects.Blob)
 end
 
+function Repo:head()
+	return self:commit(self.refs.HEAD)
+end
 
 function new(dir)
 	if not dir:match('%.git.?$') then
 		dir = join_path(dir, '.git')
 	end
+
+	local refs = {}
+	for _,d in ipairs{'refs/heads', 'refs/tags'} do
+		for fn in lfs.dir(join_path(dir, d)) do
+			if fn ~= '.' and fn ~= '..' then
+				local path = join_path(dir, d, fn)
+				local f = assert(io.open(path))
+				local ref = f:read()
+				refs[join_path(d, fn)] = ref
+			end
+		end
+	end
+
+	local head = assert(io.open(join_path(dir, 'HEAD')))
+	local src = head:read()
+	local HEAD = src:match('ref: (.-)$')
+	refs.HEAD = refs[HEAD]
+
 	return setmetatable({
-		dir = dir
+		dir = dir,
+		refs = refs,
 	}, Repo)
 end
 
