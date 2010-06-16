@@ -1,22 +1,22 @@
 require 'git'
 
-local r = git.repo.new('.')
+local r = git.repo.open('.')
 
 local c = r:head()
 
-print('Commit', commit)
+print('Commit', c.id)
 print(c.author)
 print(c.committer)
-print(table.concat(c.message))
+print(c.message)
 print()
 
 local parent = c.parents[1]
 local pc = r:commit(parent)
 
-print('Commit', parent)
+print('Commit', pc.id)
 print(pc.author)
 print(pc.committer)
-print(table.concat(pc.message))
+print(pc.message)
 print()
 
 function print_tree(tree, path)
@@ -25,6 +25,8 @@ function print_tree(tree, path)
 		print(git.util.join_path(path, name), type)
 		if type == 'tree' then
 			print_tree(entry, git.util.join_path(path, name))
+		else
+			print(entry:content())
 		end
 	end
 end
