@@ -1,4 +1,6 @@
-local next = next
+local assert, next, io, print, os, type, string =
+	assert, next, io, print, os, type, string
+local join_path = git.util.join_path
 
 module(...)
 
@@ -40,6 +42,20 @@ function Tree:entry(n)
 	end
 end
 
+function Tree:walk(func, path)
+	path = path or '.'
+	assert(type(func) == "function", "argument is not a function")
+	local function walk(tree, path)
+		for name, type, entry in tree:entries() do
+			local entry_path = join_path(path, name)
+			func(entry, entry_path, type)
+			if type == "tree" then
+				walk(entry, entry_path)
+			end
+		end
+	end
+	walk(self, path)
+end
 
 Blob = {}
 Blob.__index = Blob

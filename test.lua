@@ -19,20 +19,10 @@ print(pc.committer)
 print(pc.message)
 print()
 
-function print_tree(tree, path)
-	path = path or '.'
-	for name, type, entry in tree:entries() do
-		print(git.util.join_path(path, name), type)
-		if type == 'tree' then
-			print_tree(entry, git.util.join_path(path, name))
-		else
-			print(entry:content())
-		end
-	end
-end
-
 local tree = pc:tree()
-print_tree(tree)
+tree:walk(function(entry, entry_path, type)
+	print(type, entry_path)
+end)
 
 print()
 print(tree['git.lua']:content())
