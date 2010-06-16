@@ -203,7 +203,6 @@ end
 -- object content, length and type, otherwise returns nil
 function Pack:get_object(sha)
 	local offset = self.index[from_hex(sha)]
-	print('Looking up ', sha, 'and found', offset)
 	if not offset then return end
 
 	local data, len, type = self:read_object(offset)
