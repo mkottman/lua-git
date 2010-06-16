@@ -10,6 +10,8 @@ print(c.committer)
 print(c.message)
 print()
 
+c:checkout('tst')
+
 local parent = c.parents[1]
 local pc = r:commit(parent)
 

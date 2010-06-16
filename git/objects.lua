@@ -11,6 +11,18 @@ function Commit:tree()
 	return self.repo:tree(self.tree_sha)
 end
 
+function Commit:checkout(path)
+	assert(path, 'path argument missing')
+	self:tree():walk(function (entry, entry_path, type)
+		if type == 'tree' then
+			os.execute(string.format('mkdir -p %q', entry_path))
+		else
+			local out = assert(io.open(entry_path, 'w'))
+			out:write(entry:content())
+			out:close()
+		end
+	end, path)
+end
 
 
 Tree = {}
