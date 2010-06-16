@@ -1,5 +1,4 @@
 local io = io
-local struct = require 'struct'
 local bit = require 'bit'
 local zlib = require 'zlib'
 
@@ -9,11 +8,12 @@ local assert, pcall, print, setmetatable =
 local ord = string.byte
 local band = bit.band
 local rshift, lshift = bit.rshift, bit.lshift
-local up = struct.unpack
 local to_hex = git.util.to_hex
 local from_hex = git.util.from_hex
 
 module(...)
+
+-- read git/Documentation/technical/pack-format.txt for some inspiration
 
 -- 1 = commit, 2 = tree ...
 local types = {'commit', 'tree', 'blob', 'tag', '???', 'ofs_delta', 'ref_delta'}
@@ -120,10 +120,11 @@ static void resolve_delta(unsigned nr, enum object_type type,
 
 --]]
 
--- read git/Documentation/technical/pack-format.txt for more info
-
-Pack = {}
-Pack.__index = Pack
+local function read_int(f)
+	local s = f:read(4)
+	local a,b,c,d = s:byte(1,4)
+	return a*256^3 + b*256^2 + c*256 + d
+end
 
 -- read in the type and file length
 local function read_object_header(f)
@@ -182,6 +183,9 @@ local function unpack_delta(f, len, type)
 	end
 end
 
+Pack = {}
+Pack.__index = Pack
+
 -- read an object from the current location in pack, or from a specific `offset`
 -- if specified
 function Pack:read_object(offset)
@@ -219,14 +223,14 @@ function Pack:parse_index()
 
 	local head = f:read(4)
 	assert(head == '\255tOc', "Incorrect header: " .. head)
-	local version = up('>I4', f:read(4))
+	local version = read_int(f)
 	assert(version == 2, "Incorrect version: " .. version)
 
 	-- first the fanout table (how many objects are in the index, whose
 	-- first byte is below or equal to i)
 	local fanout = {}
 	for i=0, 255 do
-		local nobjs = up('>I4', f:read(4))
+		local nobjs = read_int(f)
 		fanout[i] = nobjs
 	end
 
@@ -247,7 +251,7 @@ function Pack:parse_index()
 
 	-- then come the offsets - read just the 32bit ones, does not handle packs > 2G
 	for i=1, count do
-		local offset = up('>I4', f:read(4))
+		local offset = read_int(f)
 		tmp[i].offset = offset
 	end
 
@@ -266,9 +270,9 @@ function Pack.open(path)
 	-- read the pack header
 	local head = fp:read(4)
 	assert(head == 'PACK', "Incorrect header: " .. head)
-	local version = up('>I4', fp:read(4))
+	local version = read_int(fp)
 	assert(version == 2, "Incorrect version: " .. version)
-	local nobj = up('>I4', fp:read(4))
+	local nobj = read_int(fp)
 
 	local pack = setmetatable({
 		offsets = {},
