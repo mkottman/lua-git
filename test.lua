@@ -28,3 +28,14 @@ end)
 
 print()
 print(tree['git.lua']:content())
+
+-- find the initial commit
+while #c.parents > 0 do
+	c = r:commit(c.parents[1])
+end
+
+print(c.message)
+
+c:tree():walk(function(entry, entry_path, type)
+	print(type, entry_path)
+end)

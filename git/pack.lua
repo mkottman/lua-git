@@ -6,10 +6,15 @@ local assert, pcall, print, setmetatable =
 	assert, pcall, print, setmetatable
 
 local ord = string.byte
+local fmt = string.format
+local concat, insert = table.concat, table.insert
+
 local band = bit.band
 local rshift, lshift = bit.rshift, bit.lshift
+
 local to_hex = git.util.to_hex
 local from_hex = git.util.from_hex
+
 
 module(...)
 
@@ -18,108 +23,7 @@ module(...)
 -- 1 = commit, 2 = tree ...
 local types = {'commit', 'tree', 'blob', 'tag', '???', 'ofs_delta', 'ref_delta'}
 
---[[
-TODO: apply deltas, from git sources
-
-delta.h:
-static inline unsigned long get_delta_hdr_size(const unsigned char **datap,
-					       const unsigned char *top)
-{
-	const unsigned char *data = *datap;
-	unsigned long cmd, size = 0;
-	int i = 0;
-	do {
-		cmd = *data++;
-		size |= (cmd & 0x7f) << i;
-		i += 7;
-	} while (cmd & 0x80 && data < top);
-	*datap = data;
-	return size;
-}
-
-patch-delta.c:
-void *patch_delta(const void *src_buf, unsigned long src_size,
-		  const void *delta_buf, unsigned long delta_size,
-		  unsigned long *dst_size)
-{
-	const unsigned char *data, *top;
-	unsigned char *dst_buf, *out, cmd;
-	unsigned long size;
-
-	if (delta_size < DELTA_SIZE_MIN)
-		return NULL;
-
-	data = delta_buf;
-	top = (const unsigned char *) delta_buf + delta_size;
-
-	/* make sure the orig file size matches what we expect */
-	size = get_delta_hdr_size(&data, top);
-	if (size != src_size)
-		return NULL;
-
-	/* now the result size */
-	size = get_delta_hdr_size(&data, top);
-	dst_buf = xmallocz(size);
-
-	out = dst_buf;
-	while (data < top) {
-		cmd = *data++;
-		if (cmd & 0x80) {
-			unsigned long cp_off = 0, cp_size = 0;
-			if (cmd & 0x01) cp_off = *data++;
-			if (cmd & 0x02) cp_off |= (*data++ << 8);
-			if (cmd & 0x04) cp_off |= (*data++ << 16);
-			if (cmd & 0x08) cp_off |= ((unsigned) *data++ << 24);
-			if (cmd & 0x10) cp_size = *data++;
-			if (cmd & 0x20) cp_size |= (*data++ << 8);
-			if (cmd & 0x40) cp_size |= (*data++ << 16);
-			if (cp_size == 0) cp_size = 0x10000;
-			if (cp_off + cp_size < cp_size ||
-			    cp_off + cp_size > src_size ||
-			    cp_size > size)
-				break;
-			memcpy(out, (char *) src_buf + cp_off, cp_size);
-			out += cp_size;
-			size -= cp_size;
-		} else if (cmd) {
-			if (cmd > size)
-				break;
-			memcpy(out, data, cmd);
-			out += cmd;
-			data += cmd;
-			size -= cmd;
-		} else {
-			/*
-			 * cmd == 0 is reserved for future encoding
-			 * extensions. In the mean time we must fail when
-			 * encountering them (might be data corruption).
-			 */
-			error("unexpected delta opcode 0");
-			goto bad;
-		}
-	}
-	...
-}
-
-builtin/unpack-objects.c:
-static void resolve_delta(unsigned nr, enum object_type type,
-			  void *base, unsigned long base_size,
-			  void *delta, unsigned long delta_size)
-{
-	void *result;
-	unsigned long result_size;
-
-	result = patch_delta(base, base_size,
-			     delta, delta_size,
-			     &result_size);
-	if (!result)
-		die("failed to apply delta");
-	free(delta);
-	write_object(nr, type, result, result_size);
-}
-
---]]
-
+-- read a 4 byte unsigned integer stored in network order
 local function read_int(f)
 	local s = f:read(4)
 	local a,b,c,d = s:byte(1,4)
@@ -170,17 +74,69 @@ local function unpack_object(f, len, type)
 	return data, len, type
 end
 
-local function unpack_delta(f, len, type)
-	-- TODO: resolve deltas
-	if type == 6 then
-		local offset = read_delta_header(f)
-		local data = uncompress_by_len(f, len)
-		return data, len, type
-	elseif type == 7 then
-		local sha = f:read(20)
-		local data = uncompress_by_len(f, len)
-		return data, len, type
+-- returns a size value encoded in delta data
+local function delta_size(f)
+	local size = 0
+	local i = 0
+	repeat
+		local b = ord(f:read(1))
+		size = size + lshift(band(b, 0x7F), i)
+		i = i + 7
+	until band(b, 0x80) == 0
+	return size
+end
+
+-- returns a patched object from string `base` according to `delta` data
+local function patch_object(base, delta)
+	-- insert delta codes into temporary file
+	local df = io.tmpfile()
+	df:write(delta)
+	df:seek('set', 0)
+
+	-- retrieve original and result size (for checks)
+	local orig_size = delta_size(df)
+	assert(#base == orig_size, fmt('#base(%d) ~= orig_size(%d)', #base, orig_size))
+
+	local result_size = delta_size(df)
+	local size = result_size
+
+	local result = {}
+
+	-- process the delta codes
+	local cmd = df:read(1)
+	while cmd do
+		cmd = ord(cmd)
+		if cmd == 0 then
+			error('unexpected delta code 0')
+		elseif band(cmd, 0x80) ~= 0 then -- copy a selected part of base data
+			local cp_off, cp_size = 0, 0
+			-- retrieve offset
+			if band(cmd, 0x01) ~= 0 then cp_off = ord(df:read(1)) end
+			if band(cmd, 0x02) ~= 0 then cp_off = cp_off + ord(df:read(1))*256 end
+			if band(cmd, 0x04) ~= 0 then cp_off = cp_off + ord(df:read(1))*256^2 end
+			if band(cmd, 0x08) ~= 0 then cp_off = cp_off + ord(df:read(1))*256^3 end
+			-- retrieve size
+			if band(cmd, 0x10) ~= 0 then cp_size = ord(df:read(1)) end
+			if band(cmd, 0x20) ~= 0 then cp_size = cp_size + ord(df:read(1))*256 end
+			if band(cmd, 0x40) ~= 0 then cp_size = cp_size + ord(df:read(1))*256^2 end
+			if cp_size == 0 then cp_size = 0x10000 end
+			if cp_off + cp_size > #base or cp_size > size then break end
+			-- get the data and append it to result
+			local data = base:sub(cp_off + 1, cp_off + cp_size)
+			insert(result, data)
+			size = size - cp_size
+		else -- insert new data
+			if cmd > size then break end
+			local data = df:read(cmd)
+			insert(result, data)
+			size = size - cmd
+		end
+		cmd = df:read(1)
 	end
+
+	result = concat(result)
+	assert(#result == result_size, fmt('#result(%d) ~= result_size(%d)', #result, result_size))
+	return result, result_size, 3
 end
 
 Pack = {}
@@ -188,16 +144,34 @@ Pack.__index = Pack
 
 -- read an object from the current location in pack, or from a specific `offset`
 -- if specified
-function Pack:read_object(offset)
+function Pack:read_object(offset, ignore_data)
 	local f = self.pack_file
 	if offset then
 		f:seek('set', offset)
 	end
+	local curr_pos = f:seek()
+
 	local len, type = read_object_header(f)
 	if type < 5 then
 		return unpack_object(f, len, type)
-	elseif type == 6 or type == 7 then
-		return unpack_delta(f, len, type)
+	elseif type == 6 then
+		local offset = read_delta_header(f)
+		local delta_data = uncompress_by_len(f, len)
+		if not ignore_data then
+			-- the offset is negative from the current location
+			local base = self:read_object(curr_pos - offset)
+			return patch_object(base, delta_data)
+		end
+	elseif type == 7 then
+		local sha = f:read(20)
+		local delta_data = uncompress_by_len(f, len)
+		if not ignore_data then
+			-- lookup the object in the pack by sha
+			-- FIXME: maybe lookup in repo/other packs
+			local base_offset = self.index[from_hex(sha)]
+			local base = self:read_object(base_offset)
+			return patch_object(base, delta_data)
+		end
 	else
 		error('unknown object type: '..type)
 	end
@@ -287,8 +261,8 @@ function Pack.open(path)
 	-- fill the offsets by traversing through the pack
 	for i=1,nobj do
 		pack.offsets[i] = fp:seek()
-		-- ignore the return value, we only need the offset
-		pack:read_object()
+		-- ignore the object data, we only need the offset in the pack
+		pack:read_object(nil, true)
 	end
 
 	return pack
