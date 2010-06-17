@@ -87,7 +87,7 @@ local function delta_size(f)
 end
 
 -- returns a patched object from string `base` according to `delta` data
-local function patch_object(base, delta)
+local function patch_object(base, delta, base_type)
 	-- insert delta codes into temporary file
 	local df = io.tmpfile()
 	df:write(delta)
@@ -136,7 +136,7 @@ local function patch_object(base, delta)
 
 	result = concat(result)
 	assert(#result == result_size, fmt('#result(%d) ~= result_size(%d)', #result, result_size))
-	return result, result_size, 3
+	return result, result_size, base_type
 end
 
 Pack = {}
@@ -159,8 +159,8 @@ function Pack:read_object(offset, ignore_data)
 		local delta_data = uncompress_by_len(f, len)
 		if not ignore_data then
 			-- the offset is negative from the current location
-			local base = self:read_object(curr_pos - offset)
-			return patch_object(base, delta_data)
+			local base, base_len, base_type = self:read_object(curr_pos - offset)
+			return patch_object(base, delta_data, base_type)
 		end
 	elseif type == 7 then
 		local sha = f:read(20)
@@ -169,8 +169,8 @@ function Pack:read_object(offset, ignore_data)
 			-- lookup the object in the pack by sha
 			-- FIXME: maybe lookup in repo/other packs
 			local base_offset = self.index[from_hex(sha)]
-			local base = self:read_object(base_offset)
-			return patch_object(base, delta_data)
+			local base, base_len, base_type = self:read_object(base_offset)
+			return patch_object(base, delta_data, base_type)
 		end
 	else
 		error('unknown object type: '..type)
