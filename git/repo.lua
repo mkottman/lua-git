@@ -11,32 +11,30 @@ local Repo = {}
 Repo.__index = Repo
 
 function Repo:raw_object(sha)
-	-- first, try to look in pack
-	for _, pack in ipairs(self.packs) do
-		local obj, len, typ = pack:get_object(sha)
-		if obj then
-			return obj, len, typ
-		end
-	end
-
-	-- then, look in 'objects' directory, first byte of sha is the directory,
-	-- the rest is name of object file
+	-- first, look in 'objects' directory
+	-- first byte of sha is the directory, the rest is name of object file
 	local dir = sha:sub(1,2)
 	local file = sha:sub(3)
 	local path = join_path(self.dir, 'objects', dir, file)
 
 	if not lfs.attributes(path, 'size') then
-		error('Object '..sha..' does not exist in repository')
+		-- then, try to look in packs
+		for _, pack in ipairs(self.packs) do
+			local obj, len, typ = pack:get_object(sha)
+			if obj then
+				return obj, len, typ
+			end
+		end
+	else
+		-- the objects are zlib compressed
+		local f = decompressed(path)
+
+		-- retrieve the type and length - <type> SP <len> \0 <data...>
+		local content = read_until_nul(f)
+		local typ, len = content:match('(%w+) (%d+)')
+
+		return f, len, typ
 	end
-
-	-- the objects are zlib compressed
-	local f = decompressed(path)
-
-	-- retrieve the type and length - <type> SP <len> \0 <data...>
-	local content = read_until_nul(f)
-	local typ, len = content:match('(%w+) (%d+)')
-
-	return f, len, typ
 end
 
 function Repo:commit(sha)
@@ -106,6 +104,20 @@ function Repo:head()
 	return self:commit(self.refs.HEAD)
 end
 
+function Repo:has_object(sha)
+	local dir = sha:sub(1,2)
+	local file = sha:sub(3)
+	local path = join_path(self.dir, 'objects', dir, file)
+
+	if lfs.attributes(path, 'size') then return true end
+
+	for _, pack in ipairs(self.packs) do
+		local has = pack:has_object(sha)
+		if has then return true end
+	end
+
+	return false
+end
 -- opens a repository located in `dir`
 function open(dir)
 	if not dir:match('%.git.?$') then

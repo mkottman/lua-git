@@ -69,6 +69,7 @@ local function uncompress_by_len(f, size)
 	return res
 end
 
+-- uncompress the object from the current location in `f`
 local function unpack_object(f, len, type)
 	local data = uncompress_by_len(f, len)
 	return data, len, type
@@ -152,9 +153,9 @@ function Pack:read_object(offset, ignore_data)
 	local curr_pos = f:seek()
 
 	local len, type = read_object_header(f)
-	if type < 5 then
+	if type < 5 then -- commit, tree, blob, tag
 		return unpack_object(f, len, type)
-	elseif type == 6 then
+	elseif type == 6 then -- ofs_delta
 		local offset = read_delta_header(f)
 		local delta_data = uncompress_by_len(f, len)
 		if not ignore_data then
@@ -162,7 +163,7 @@ function Pack:read_object(offset, ignore_data)
 			local base, base_len, base_type = self:read_object(curr_pos - offset)
 			return patch_object(base, delta_data, base_type)
 		end
-	elseif type == 7 then
+	elseif type == 7 then -- ref_delta
 		local sha = f:read(20)
 		local delta_data = uncompress_by_len(f, len)
 		if not ignore_data then
@@ -175,6 +176,11 @@ function Pack:read_object(offset, ignore_data)
 	else
 		error('unknown object type: '..type)
 	end
+end
+
+-- returns true if this pack contains the given object
+function Pack:has_object(sha)
+	return self.index[from_hex(sha)] ~= nil
 end
 
 -- if the object name `sha` exists in the pack, returns a temporary file with the

@@ -10,6 +10,7 @@ print(c.committer)
 print(c.message)
 print()
 
+-- extract the head into directory 'tst'
 c:checkout('tst')
 
 local parent = c.parents[1]
@@ -37,5 +38,7 @@ end
 print(c.message)
 
 c:tree():walk(function(entry, entry_path, type)
-	print(type, entry_path)
+	print(type, entry_path, entry.id)
 end)
+
+assert(r:has_object('10909b56ced7f4ce9f23304ff408e7f8b88ca08b'))
