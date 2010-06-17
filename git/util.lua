@@ -1,4 +1,5 @@
 local zlib = require 'zlib'
+local crypto = require 'crypto'
 
 module(..., package.seeall)
 
@@ -61,4 +62,10 @@ function from_hex(s)
 	return (s:gsub('..', function(cc)
 		return string.char(tonumber(cc, 16))
 	end))
+end
+
+function object_sha(data, len, type)
+	local header = type .. ' ' .. len .. '\0' 
+	local sha = crypto.digest('sha1', header .. data)
+	return sha
 end

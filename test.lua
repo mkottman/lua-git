@@ -10,7 +10,6 @@ print(c.committer)
 print(c.message)
 print()
 
--- extract the head into directory 'tst'
 c:checkout('tst')
 
 local parent = c.parents[1]
@@ -38,7 +37,11 @@ end
 print(c.message)
 
 c:tree():walk(function(entry, entry_path, type)
-	print(type, entry_path, entry.id)
+	print(type, entry_path)
 end)
 
-assert(r:has_object('10909b56ced7f4ce9f23304ff408e7f8b88ca08b'))
+os.execute('rm -rf tst2')
+os.execute('mkdir tst2')
+os.execute('cd tst2 && git init')
+r = git.repo.open('tst2')
+git.protocol.fetch(r, 'git://github.com/mkottman/lua-git.git')

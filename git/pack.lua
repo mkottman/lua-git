@@ -1,6 +1,7 @@
 local io = io
 local bit = require 'bit'
 local zlib = require 'zlib'
+local crypto = require 'crypto'
 
 local assert, pcall, print, setmetatable =
 	assert, pcall, print, setmetatable
@@ -14,7 +15,7 @@ local rshift, lshift = bit.rshift, bit.lshift
 
 local to_hex = git.util.to_hex
 local from_hex = git.util.from_hex
-
+local object_sha = git.util.object_sha
 
 module(...)
 
@@ -197,9 +198,17 @@ function Pack:get_object(sha)
 	return f, len, types[type]
 end
 
+function Pack:unpack(repo)
+	for i=1, self.nobjects do
+		local offset = self.offsets[i]
+		local data, len, type = self:read_object(offset)
+		repo:store_object(data, len, types[type])
+	end
+end
+
 -- parses the index
-function Pack:parse_index()
-	local f = self.index_file
+function Pack:parse_index(index_file)
+	local f = index_file
 
 	local head = f:read(4)
 	assert(head == '\255tOc', "Incorrect header: " .. head)
@@ -243,10 +252,22 @@ function Pack:parse_index()
 	self.index = lookup
 end
 
+-- constructs the index/offsets if the index file is missing
+function Pack:construct_index(path)
+	local index = {}
+	for i=1, self.nobjects do
+		local offset = self.offsets[i]
+		local data, len, type = self:read_object(offset)
+		local sha = object_sha(data, len, types[type])
+		index[to_hex(sha)] = offset
+	end
+	self.index = index
+end
+
 function Pack.open(path)
 	local fp = assert(io.open(path))
-	local fi = assert(io.open((path:gsub('%.pack$', '.idx'))))
-
+	local fi = io.open((path:gsub('%.pack$', '.idx')))
+	
 	-- read the pack header
 	local head = fp:read(4)
 	assert(head == 'PACK', "Incorrect header: " .. head)
@@ -258,17 +279,20 @@ function Pack.open(path)
 		offsets = {},
 		nobjects = nobj,
 		pack_file = fp,
-		index_file = fi,
 	}, Pack)
-
-	-- read the index
-	pack:parse_index()
-
+	
 	-- fill the offsets by traversing through the pack
 	for i=1,nobj do
 		pack.offsets[i] = fp:seek()
 		-- ignore the object data, we only need the offset in the pack
 		pack:read_object(nil, true)
+	end
+
+	-- read the index
+	if fi then
+		pack:parse_index(fi)
+	else
+		pack:construct_index(path)
 	end
 
 	return pack

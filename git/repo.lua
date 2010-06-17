@@ -2,6 +2,7 @@ local join_path = git.util.join_path
 local decompressed = git.util.decompressed
 local read_until_nul = git.util.read_until_nul
 local to_hex = git.util.to_hex
+local object_sha = git.util.object_sha
 
 local lfs = require 'lfs'
 
@@ -35,6 +36,17 @@ function Repo:raw_object(sha)
 
 		return f, len, typ
 	end
+end
+
+function Repo:store_object(data, len, type)
+	local sha = object_sha(data, len, type)
+	local dir = sha:sub(1,2)
+	local file = sha:sub(3)
+	os.execute('mkdir -p '..join_path(self.dir, 'objects', dir))
+	local path = join_path(self.dir, 'objects', dir, file)
+	local fo = assert(io.open(path, 'w'))
+	fo:write(data)
+	fo:close()
 end
 
 function Repo:commit(sha)
