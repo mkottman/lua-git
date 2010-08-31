@@ -60,14 +60,19 @@ end
 -- read just enough of file `f` to uncompress `size` bytes
 local function uncompress_by_len(f, size)
 	local z = zlib.inflate()
-	-- read `size` bytes, even though it will be more than needed
-	-- however, we cannot know in advance, how many bytes we will need
-	local data = f:read(size + 64)
-	local ok, res, total = pcall(z, data)
-	if not ok or not total then print('>>>', data, res) end
+	local chunks = {}
+	local CHUNK_SIZE = 1024
+	local curr_pos = f:seek()
+	local inflated, eof, total
+	-- read until end of zlib-compresed stream
+	while not eof do
+		local data = f:read(CHUNK_SIZE)
+		inflated, eof, total = z(data)
+		insert(chunks, inflated)
+	end
 	-- repair the current position in stream
-	f:seek('cur', -#data + total)
-	return res
+	f:seek('set', curr_pos + total)
+	return concat(chunks)
 end
 
 -- uncompress the object from the current location in `f`
