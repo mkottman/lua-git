@@ -2,6 +2,8 @@ local assert, next, io, print, os, type, string =
 	assert, next, io, print, os, type, string
 local join_path = git.util.join_path
 
+local require = require
+
 module(...)
 
 Commit = {}
@@ -13,15 +15,7 @@ end
 
 function Commit:checkout(path)
 	assert(path, 'path argument missing')
-	self:tree():walk(function (entry, entry_path, type)
-		if type == 'tree' then
-			os.execute(string.format('mkdir -p %q', entry_path))
-		else
-			local out = assert(io.open(entry_path, 'w'))
-			out:write(entry:content())
-			out:close()
-		end
-	end, path)
+	self:tree():checkoutTo(path)
 end
 
 
@@ -67,6 +61,19 @@ function Tree:walk(func, path)
 		end
 	end
 	walk(self, path)
+end
+
+function Tree:checkoutTo(path)
+	os.execute(string.format('mkdir -p %q', path))
+	self:walk(function (entry, entry_path, type)
+		if type == 'tree' then
+			os.execute(string.format('mkdir -p %q', entry_path))
+		else
+			local out = assert(io.open(entry_path, 'w'))
+			out:write(entry:content())
+			out:close()
+		end
+	end, path)
 end
 
 Blob = {}

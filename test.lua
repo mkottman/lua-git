@@ -1,3 +1,6 @@
+package.path = package.path .. ';lua/?.lua'
+package.cpath = package.cpath .. ';b/?.so'
+
 require 'git'
 
 local r = git.repo.open('.')
@@ -44,4 +47,4 @@ os.execute('rm -rf tst2')
 os.execute('mkdir tst2')
 os.execute('cd tst2 && git init')
 r = git.repo.open('tst2')
-git.protocol.fetch(r, 'git://github.com/mkottman/lua-git.git')
+git.protocol.fetch('git://github.com/mkottman/lua-git.git', r)

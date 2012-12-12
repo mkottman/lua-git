@@ -1,19 +1,30 @@
-local join_path = git.util.join_path
-local decompressed = git.util.decompressed
-local read_until_nul = git.util.read_until_nul
-local to_hex = git.util.to_hex
-local object_sha = git.util.object_sha
+local util = require 'git.util'
+local objects = require 'git.objects'
+local core = require 'git.core'
+local pack = require 'git.pack'
+
+local join_path = util.join_path
+local decompressed = util.decompressed
+local read_until_nul = util.read_until_nul
+local to_hex = util.to_hex
+local object_sha = util.object_sha
+local readable_sha = util.readable_sha
+
+local deflate = core.deflate
 
 local lfs = require 'lfs'
+local assert, error, io, ipairs, print, os, setmetatable, string, table =
+	assert, error, io, ipairs, print, os, setmetatable, string, table
 
-module(..., package.seeall)
+module(...)
 
-local Repo = {}
+Repo = {}
 Repo.__index = Repo
 
 function Repo:raw_object(sha)
 	-- first, look in 'objects' directory
 	-- first byte of sha is the directory, the rest is name of object file
+	sha = readable_sha(sha)
 	local dir = sha:sub(1,2)
 	local file = sha:sub(3)
 	local path = join_path(self.dir, 'objects', dir, file)
@@ -26,7 +37,8 @@ function Repo:raw_object(sha)
 				return obj, len, typ
 			end
 		end
-	else
+		error('Object not found in object neither in packs: '..sha)
+	else		
 		-- the objects are zlib compressed
 		local f = decompressed(path)
 
@@ -39,13 +51,15 @@ function Repo:raw_object(sha)
 end
 
 function Repo:store_object(data, len, type)
-	local sha = object_sha(data, len, type)
+	local sha = readable_sha(object_sha(data, len, type))
 	local dir = sha:sub(1,2)
 	local file = sha:sub(3)
 	os.execute('mkdir -p '..join_path(self.dir, 'objects', dir))
 	local path = join_path(self.dir, 'objects', dir, file)
 	local fo = assert(io.open(path, 'w'))
-	fo:write(data)
+	local header = type .. ' ' .. len .. '\0'
+	local compressed = deflate()(header .. data, "finish")
+	fo:write(compressed)
 	fo:close()
 end
 
@@ -79,7 +93,7 @@ function Repo:commit(sha)
 
 	commit.message = table.concat(commit.message, '\n')
 
-	return setmetatable(commit, git.objects.Commit)
+	return setmetatable(commit, objects.Commit)
 end
 
 function Repo:tree(sha)
@@ -97,7 +111,7 @@ function Repo:tree(sha)
 		tree._entries[name] = { mode = mode, id = entry_sha, type = entry_type }
 	end
 
-	return setmetatable(tree, git.objects.Tree)
+	return setmetatable(tree, objects.Tree)
 end
 
 -- retrieves a Blob
@@ -109,7 +123,7 @@ function Repo:blob(sha)
 
 	local blob = { id = sha, len = len, repo = self, stored = true }
 
-	return setmetatable(blob, git.objects.Blob)
+	return setmetatable(blob, objects.Blob)
 end
 
 function Repo:head()
@@ -130,6 +144,29 @@ function Repo:has_object(sha)
 
 	return false
 end
+
+function Repo:checkout(sha, target)
+	local commit = self:commit(sha)
+	commit:checkout(target)
+end
+
+function create(dir)
+	if not dir:match('%.git.?$') then
+		dir = join_path(dir, '.git')
+	end
+	
+	os.execute('mkdir -p '..dir)
+
+	local refs = {}
+	local packs = {}
+
+	return setmetatable({
+		dir = dir,
+		refs = refs,
+		packs = packs,
+	}, Repo)
+end
+
 -- opens a repository located in `dir`
 function open(dir)
 	if not dir:match('%.git.?$') then
@@ -152,14 +189,16 @@ function open(dir)
 	for fn in lfs.dir(join_path(dir, 'objects/pack')) do
 		if fn:match('%.pack$') then
 			local path = join_path(dir, 'objects/pack', fn)
-			table.insert(packs, git.pack.Pack.open(path))
+			table.insert(packs, pack.open(path))
 		end
 	end
 
-	local head = assert(io.open(join_path(dir, 'HEAD')))
-	local src = head:read()
-	local HEAD = src:match('ref: (.-)$')
-	refs.HEAD = refs[HEAD]
+	local head = io.open(join_path(dir, 'HEAD'))
+	if head then
+		local src = head:read()
+		local HEAD = src:match('ref: (.-)$')
+		refs.HEAD = refs[HEAD]
+	end
 
 	return setmetatable({
 		dir = dir,

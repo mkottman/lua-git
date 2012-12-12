@@ -2,11 +2,12 @@ local socket = require 'socket'
 local urllib = require 'socket.url'
 local lfs = require 'lfs'
 
+local Repo = git.repo.Repo
 local Pack = git.pack.Pack
 local join_path = git.util.join_path
 
-local assert, io, os, pairs, print, string, tonumber =
-	assert, io, os, pairs, print, string, tonumber
+local assert, error, getmetatable, io, os, pairs, print, require, string, tonumber =
+	assert, error, getmetatable, io, os, pairs, print, require, string, tonumber
 
 module(...)
 
@@ -37,7 +38,7 @@ local function git_connect(host)
 	return gitsocket
 end
 
-local function git_fetch(repo, host, path)
+local function git_fetch(host, path, repo, head)
 	local s = git_connect(host)
 	s:send('git-upload-pack '..path..'\0host='..host..'\0')
 
@@ -49,13 +50,37 @@ local function git_fetch(repo, host, path)
 			refs[sha] = name
 		end
 	until not ref
+
+	local wantedSha
 	
-	for sha in pairs(refs) do
-		if not repo:has_object(sha) then
-			s:send('want '..sha..'  multi_ack_detailed side-band-64k ofs-delta\n')
+	for sha, ref in pairs(refs) do
+		-- print(sha, ref)
+		-- we implicitly want this ref
+		local wantObject = true 
+		-- unless we ask for a specific head
+		if head then            
+			if ref ~= head then
+				wantObject = false
+			else
+				wantedSha = sha
+			end
+		end
+		-- or we already have it
+		if repo and repo:has_object(sha) then
+			wantObject = false
+		end
+		if wantObject then
+			s:send('want '..sha..' multi_ack_detailed side-band-64k ofs-delta\n')
 		end
 	end
+
+	if head and not wantedSha then
+		error("Server does not have "..head)
+	end
+
+	s:send('deepen 1')
 	s:send()
+	while s:receive() do end
 	s:send('done\n')
 	
 	assert(s:receive() == "NAK\n")
@@ -80,13 +105,18 @@ local function git_fetch(repo, host, path)
 	packfile:close()
 	
 	local pack = Pack.open(packname)
-	pack:unpack(repo)
+	if repo then
+		pack:unpack(repo)
+	end
+	return pack, wantedSha
 end
 
-function fetch(repo, url)
-	url =urllib.parse(url)
+function fetch(url, repo, head)
+	if repo then assert(getmetatable(repo) == Repo, "arg #2 is not a repository") end
+	url = urllib.parse(url)
 	if url.scheme == 'git' then
-		git_fetch(repo, url.host, url.path)
+		local pack, sha = git_fetch(url.host, url.path, repo, head)
+		return pack, sha
 	else
 		error('unsupported scheme: '..u.scheme)
 	end

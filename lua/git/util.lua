@@ -1,5 +1,7 @@
-local zlib = require 'zlib'
-local crypto = require 'crypto'
+local core = require 'git.core'
+local deflate = core.deflate
+local inflate = core.inflate
+local sha = core.sha
 
 module(..., package.seeall)
 
@@ -23,15 +25,15 @@ function decompressed(path)
 	local fi = assert(io.open(path))
 	local fo = io.tmpfile()
 
-	local z = zlib.inflate()
+	local z = inflate()
 	repeat
 		local str = fi:read(BUF_SIZE)
 		local data = z(str)
 		if type(data) == 'string' then
-			fo:write(data)
+			assert(fo:write(data))
 		else print('!!!', data) end
 	until not str
-
+	fo:flush()
 	fo:seek('set')
 	return fo
 end
@@ -64,8 +66,25 @@ function from_hex(s)
 	end))
 end
 
-function object_sha(data, len, type)
-	local header = type .. ' ' .. len .. '\0' 
-	local sha = crypto.digest('sha1', header .. data)
-	return sha
+-- always returns readable (hex) hash
+function readable_sha(s)
+	if #s ~= 40 then return to_hex(s)
+	else return s end
 end
+
+-- always returns binary hash
+function binary_sha(s)
+	if #s ~= 20 then return from_hex(s)
+	else return s end
+end
+
+function object_sha(data, len, type)
+	local header = type .. ' ' .. len .. '\0'
+	local res = sha(header .. data)
+	return res
+end
+
+function deflate(data)
+	local c = deflate()
+	return c(data, "finish")
+end 

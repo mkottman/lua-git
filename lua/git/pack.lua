@@ -1,7 +1,5 @@
 local io = io
-local bit = require 'bit'
-local zlib = require 'zlib'
-local crypto = require 'crypto'
+local core = require 'git.core'
 
 local assert, pcall, print, setmetatable =
 	assert, pcall, print, setmetatable
@@ -10,12 +8,14 @@ local ord = string.byte
 local fmt = string.format
 local concat, insert = table.concat, table.insert
 
-local band = bit.band
-local rshift, lshift = bit.rshift, bit.lshift
+local band = core.band
+local rshift, lshift = core.rshift, core.lshift
 
 local to_hex = git.util.to_hex
 local from_hex = git.util.from_hex
 local object_sha = git.util.object_sha
+local binary_sha = git.util.binary_sha
+local readable_sha = git.util.readable_sha
 
 module(...)
 
@@ -59,7 +59,7 @@ end
 
 -- read just enough of file `f` to uncompress `size` bytes
 local function uncompress_by_len(f, size)
-	local z = zlib.inflate()
+	local z = core.inflate()
 	local chunks = {}
 	local CHUNK_SIZE = 1024
 	local curr_pos = f:seek()
@@ -175,7 +175,7 @@ function Pack:read_object(offset, ignore_data)
 		if not ignore_data then
 			-- lookup the object in the pack by sha
 			-- FIXME: maybe lookup in repo/other packs
-			local base_offset = self.index[from_hex(sha)]
+			local base_offset = self.index[binary_sha(sha)]
 			local base, base_len, base_type = self:read_object(base_offset)
 			return patch_object(base, delta_data, base_type)
 		end
@@ -186,16 +186,19 @@ end
 
 -- returns true if this pack contains the given object
 function Pack:has_object(sha)
-	return self.index[from_hex(sha)] ~= nil
+	return self.index[binary_sha(sha)] ~= nil
 end
 
 -- if the object name `sha` exists in the pack, returns a temporary file with the
 -- object content, length and type, otherwise returns nil
 function Pack:get_object(sha)
-	local offset = self.index[from_hex(sha)]
-	if not offset then return end
+	local offset = self.index[binary_sha(sha)]
+	if not offset then
+		print('!!! Failed to find object', readable_sha(sha))
+	end
 
 	local data, len, type = self:read_object(offset)
+	print(readable_sha(sha), len, type, data)
 	local f = io.tmpfile()
 	f:write(data)
 	f:seek('set', 0)
@@ -264,7 +267,7 @@ function Pack:construct_index(path)
 		local offset = self.offsets[i]
 		local data, len, type = self:read_object(offset)
 		local sha = object_sha(data, len, types[type])
-		index[to_hex(sha)] = offset
+		index[binary_sha(sha)] = offset
 	end
 	self.index = index
 end
