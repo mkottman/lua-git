@@ -3,12 +3,14 @@
 name = "lua-git"
 version = "0.1"
 
-desc = "Network support for the Lua language"
+desc = "An attempt to implement the basics of Git in pure Lua"
 author = "Michal Kottman"
 license = "MIT/X11"
 url = "https://github.com/mkottman/lua-git"
 maintainer = "Michal Kottman"
 
 depends = {
-	"lua ~> 5.1"
+	"lua ~> 5.1",
+  "luasocket >= 2.0.0",
+  "luafilesystem >= 1.6",
 }

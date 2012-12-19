@@ -13,8 +13,7 @@ set ( INSTALL_CMOD ${INSTALL_LIB}/lua
 
 option ( LUA_SKIP_WRAPPER
          "Do not build and install Lua executable wrappers." OFF )
-option ( LUA_STATIC_MODULE "Build modules for static linking" ON )
-option ( LUA_DYNAMIC_MODULE "Build modules for dynamic linking" OFF )
+option ( LUA_STATIC_MODULE "Build modules for static linking" OFF )
 
 # List of (Lua module name, file path) pairs.
 # Used internally by add_lua_test.  Built by add_lua_module.
@@ -127,27 +126,27 @@ macro ( _lua_module_helper is_install _name )
              "${CMAKE_CURRENT_BINARY_DIR}/\${CMAKE_CFG_INTDIR}/${_module}" )
     endforeach ()
 	
-    # Static module
+    # Static module (not linking to lua)
     if ( LUA_STATIC_MODULE )
-    	add_library( ${_target}_static STATIC ${_MODULE_SRC})
-    	target_link_libraries ( ${_target}_static ${_MODULE_LINK} )
-      set_target_properties ( ${_target}_static PROPERTIES ARCHIVE_OUTPUT_DIRECTORY
-                  "${_module_dir}" PREFIX "" OUTPUT_NAME "${_module_filenamebase}" )
-      if ( ${is_install} )
-        message( ">>> ${_module_dir}: install ( TARGETS ${_target}_static DESTINATION ${INSTALL_CMOD}/${_module_dir} COMPONENT Library )")
-        install ( TARGETS ${_target}_static DESTINATION ${INSTALL_CMOD}/${_module_dir} COMPONENT Library )
-      endif ()
-    endif ()
-   
+    	add_library( ${_target} STATIC ${_MODULE_SRC})
+    	target_link_libraries ( ${_target} ${_MODULE_LINK} )
+    else ()
     # Dynamic module
-    if ( LUA_DYNAMIC_MODULE )
       add_library( ${_target} MODULE ${_MODULE_SRC})
       target_link_libraries ( ${_target} ${LUA_LIBRARY} ${_MODULE_LINK} )
-      set_target_properties ( ${_target} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
-                  "${_module_dir}" PREFIX "" OUTPUT_NAME "${_module_filenamebase}" )
-      if ( ${is_install} )
-        install ( TARGETS ${_target} DESTINATION ${INSTALL_CMOD}/${_module_dir} COMPONENT Runtime)
-      endif ()
+    endif ()
+
+    set_target_properties ( ${_target} PROPERTIES 
+      ARCHIVE_OUTPUT_DIRECTORY "${_module_dir}" 
+      LIBRARY_OUTPUT_DIRECTORY "${_module_dir}" 
+      PREFIX "" 
+      OUTPUT_NAME "${_module_filenamebase}" )
+    if ( ${is_install} )
+      install ( TARGETS ${_target} 
+        LIBRARY DESTINATION ${INSTALL_CMOD}/${_module_dir}
+        COMPONENT Runtime
+        ARCHIVE DESTINATION ${INSTALL_CMOD}/${_module_dir}
+        COMPONENT Library )
     endif ()
   endif ()
 endmacro ()
