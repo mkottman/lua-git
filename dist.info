@@ -10,7 +10,7 @@ url = "https://github.com/mkottman/lua-git"
 maintainer = "Michal Kottman"
 
 depends = {
-	"lua ~> 5.1",
+  "lua ~> 5.1",
   "luasocket >= 2.0.0",
   "luafilesystem >= 1.6",
 }
