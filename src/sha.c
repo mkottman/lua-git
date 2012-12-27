@@ -81,7 +81,16 @@ A million repetitions of "a"
 #include <stdio.h>
 #include <string.h>
 
-#include <stdint.h>
+#ifdef _MSC_VER
+typedef char int8_t;
+typedef unsigned char uint8_t;
+typedef __int32 int32_t;
+typedef unsigned __int32 uint32_t;
+typedef __int64 int64_t;
+typedef unsigned __int64 uint64_t;
+#else
+#   include <stdint.h>
+#endif
 
 /* public api for steve reid's public domain SHA-1 implementation */
 /* this file is in the public domain */

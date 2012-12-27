@@ -35,6 +35,10 @@ local function git_connect(host)
 		return data
 	end
 
+	function gitsocket:close()
+		sock:close()
+	end
+
 	return gitsocket
 end
 
@@ -102,8 +106,10 @@ local function git_fetch(host, path, repo, head)
 			end
 		end
 	until not got
+
 	packfile:close()
-	
+	s:close()
+
 	local pack = Pack.open(packname)
 	if repo then
 		pack:unpack(repo)
@@ -118,6 +124,33 @@ function fetch(url, repo, head)
 		local pack, sha = git_fetch(url.host, url.path, repo, head)
 		return pack, sha
 	else
-		error('unsupported scheme: '..u.scheme)
+		error('unsupported scheme: '..url.scheme)
 	end
+end
+
+function remotes(url)
+	-- TODO: refactor common code
+	url = assert(urllib.parse(url))
+
+	if url.scheme ~= 'git' then
+		error('unsupported scheme: '..url.scheme)
+	end
+
+	local host, path = url.host, url.path
+
+	local s = git_connect(host)
+	s:send('git-upload-pack '..path..'\0host='..host..'\0')
+
+	local remote = {}
+	repeat
+		local ref = s:receive()
+		if ref then
+			local sha, name = ref:sub(1,40), ref:sub(42, -2)
+			remote[name] = sha
+		end
+	until not ref
+
+	s:close()
+
+	return remote
 end

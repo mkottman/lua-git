@@ -1,9 +1,9 @@
 --- This file is part of LuaDist project
 
 name = "lua-git"
-version = "0.1"
+version = "0.2"
 
-desc = "An attempt to implement the basics of Git in pure Lua"
+desc = "A library to access Git repositories and its objects (files, commits) in Lua"
 author = "Michal Kottman"
 license = "MIT/X11"
 url = "https://github.com/mkottman/lua-git"

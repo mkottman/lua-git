@@ -9,10 +9,12 @@ cmake_minimum_required ( VERSION 2.8 )
 include ( cmake/dist.cmake )
 include ( lua )
 
-find_package ( ZLIB )
+find_package ( ZLIB REQUIRED )
 
 set ( SRC src/bit.c src/core.c src/sha.c src/zlib.c )
 set ( LIB ${ZLIB_LIBRARIES} )
+
+include_directories ( ${ZLIB_INCLUDE_DIR} )
 
 # Binary
 install_lua_module ( git.core ${SRC} LINK ${LIB} )
