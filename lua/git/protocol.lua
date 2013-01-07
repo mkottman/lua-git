@@ -46,24 +46,25 @@ local function git_fetch(host, path, repo, head)
 	local s = git_connect(host)
 	s:send('git-upload-pack '..path..'\0host='..host..'\0')
 
-	local refs = {}
+	local refs, refsbyname = {}, {}
 	repeat
 		local ref = s:receive()
 		if ref then
 			local sha, name = ref:sub(1,40), ref:sub(42, -2)
 			refs[sha] = name
+			refsbyname[name] = sha
 		end
 	until not ref
 
 	local wantedSha
-	
+	local headsha = head and refsbyname[head]
+
 	for sha, ref in pairs(refs) do
-		-- print(sha, ref)
 		-- we implicitly want this ref
 		local wantObject = true 
 		-- unless we ask for a specific head
-		if head then            
-			if ref ~= head then
+		if headsha then         
+			if sha ~= headsha then
 				wantObject = false
 			else
 				wantedSha = sha
