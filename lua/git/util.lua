@@ -66,7 +66,7 @@ local function parent_dir(path)
     if dir == "" then
         return nil
     else
-        return dir
+        return remove_trailing(dir)
     end
 end
 
