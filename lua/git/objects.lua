@@ -31,11 +31,19 @@ function Tree:entries()
 	return function(t, n)
 		local n, entry = next(t, n)
 		if entry then
+			local object
 			if entry.type == 'tree' then
-				return n, entry.type, self.repo:tree(entry.id)
+				object = self.repo:tree(entry.id)
+			elseif entry.type == 'blob' then
+				object = self.repo:blob(entry.id)
+			elseif entry.type == 'commit' then
+				-- this is possibly a commit in a submodule, 
+				-- do not retrieve it from current repo
+				object = entry
 			else
-				return n, entry.type, self.repo:blob(entry.id)
+				error('Unknown entry type: ' .. entry.type)
 			end
+			return n, entry.type, object
 		end
 	end, self._entries
 end
@@ -45,8 +53,12 @@ function Tree:entry(n)
 	if not e then return end
 	if e.type == 'tree' then
 		return self.repo:tree(e.id)
-	else
+	elseif e.type == 'commit' then
+		return self.repo:commit(e.id)
+	elseif e.type == 'blob' then
 		return self.repo:blob(e.id)
+	else
+		error('Unknown entry type: ' .. e.type)
 	end
 end
 
@@ -67,15 +79,19 @@ end
 
 function Tree:checkoutTo(path)
 	util.make_dir(path)
-	--os.execute(string.format('mkdir -p %q', path))
 	self:walk(function (entry, entry_path, type)
 		if type == 'tree' then
 			util.make_dir(entry_path)
-			--os.execute(string.format('mkdir -p %q', entry_path))
-		else
+		elseif type == 'blob' then
 			local out = assert(io.open(entry_path, 'wb'))
 			out:write(entry:content())
 			out:close()
+		elseif type == 'commit' then
+			-- this is a submodule referencing a commit,
+			-- make a directory for it
+			util.make_dir(entry_path)
+		else
+			error('Unknown entry type: ', type)
 		end
 	end, path)
 end

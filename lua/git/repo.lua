@@ -108,7 +108,12 @@ function Repo:tree(sha)
 		if not info then break end
 		local entry_sha = to_hex(f:read(20))
 		local mode, name = info:match('^(%d+)%s(.+)$')
-		local entry_type = mode == '40000' and 'tree' or 'blob'
+		local entry_type = 'blob'
+		if mode == '40000' then
+			entry_type = 'tree'
+		elseif mode == '160000' then
+			entry_type = 'commit'
+		end
 		tree._entries[name] = { mode = mode, id = entry_sha, type = entry_type }
 	end
 
