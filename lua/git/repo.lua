@@ -57,7 +57,7 @@ function Repo:store_object(data, len, type)
 	util.make_dir(join_path(self.dir, 'objects', dir))
 	--os.execute('mkdir -p '..join_path(self.dir, 'objects', dir))
 	local path = join_path(self.dir, 'objects', dir, file)
-	local fo = assert(io.open(path, 'w'))
+	local fo = assert(io.open(path, 'wb'))
 	local header = type .. ' ' .. len .. '\0'
 	local compressed = deflate()(header .. data, "finish")
 	fo:write(compressed)
@@ -180,7 +180,7 @@ function open(dir)
 		for fn in lfs.dir(join_path(dir, d)) do
 			if fn ~= '.' and fn ~= '..' then
 				local path = join_path(dir, d, fn)
-				local f = assert(io.open(path))
+				local f = assert(io.open(path), 'rb')
 				local ref = f:read()
 				refs[join_path(d, fn)] = ref
 			end
@@ -195,7 +195,7 @@ function open(dir)
 		end
 	end
 
-	local head = io.open(join_path(dir, 'HEAD'))
+	local head = io.open(join_path(dir, 'HEAD'), 'rb')
 	if head then
 		local src = head:read()
 		local HEAD = src:match('ref: (.-)$')

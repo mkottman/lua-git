@@ -91,7 +91,7 @@ local function git_fetch(host, path, repo, head)
 	assert(s:receive() == "NAK\n")
 	
 	local packname = os.tmpname() .. '.pack'
-	local packfile = assert(io.open(packname, 'w'))
+	local packfile = assert(io.open(packname, 'wb'))
 	repeat
 		local got = s:receive()
 		if got then

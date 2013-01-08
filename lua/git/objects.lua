@@ -73,7 +73,7 @@ function Tree:checkoutTo(path)
 			util.make_dir(entry_path)
 			--os.execute(string.format('mkdir -p %q', entry_path))
 		else
-			local out = assert(io.open(entry_path, 'w'))
+			local out = assert(io.open(entry_path, 'wb'))
 			out:write(entry:content())
 			out:close()
 		end
