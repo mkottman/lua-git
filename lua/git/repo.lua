@@ -54,7 +54,8 @@ function Repo:store_object(data, len, type)
 	local sha = readable_sha(object_sha(data, len, type))
 	local dir = sha:sub(1,2)
 	local file = sha:sub(3)
-	os.execute('mkdir -p '..join_path(self.dir, 'objects', dir))
+	util.make_dir(join_path(self.dir, 'objects', dir))
+	--os.execute('mkdir -p '..join_path(self.dir, 'objects', dir))
 	local path = join_path(self.dir, 'objects', dir, file)
 	local fo = assert(io.open(path, 'w'))
 	local header = type .. ' ' .. len .. '\0'
@@ -155,7 +156,8 @@ function create(dir)
 		dir = join_path(dir, '.git')
 	end
 	
-	os.execute('mkdir -p '..dir)
+	util.make_dir(dir)
+	-- os.execute('mkdir -p '..dir)
 
 	local refs = {}
 	local packs = {}
