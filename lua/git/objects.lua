@@ -1,3 +1,5 @@
+local util = require 'git.util'
+
 local assert, next, io, print, os, type, string =
 	assert, next, io, print, os, type, string
 local join_path = git.util.join_path
@@ -64,10 +66,12 @@ function Tree:walk(func, path)
 end
 
 function Tree:checkoutTo(path)
-	os.execute(string.format('mkdir -p %q', path))
+	util.make_dir(path)
+	--os.execute(string.format('mkdir -p %q', path))
 	self:walk(function (entry, entry_path, type)
 		if type == 'tree' then
-			os.execute(string.format('mkdir -p %q', entry_path))
+			util.make_dir(entry_path)
+			--os.execute(string.format('mkdir -p %q', entry_path))
 		else
 			local out = assert(io.open(entry_path, 'w'))
 			out:write(entry:content())
