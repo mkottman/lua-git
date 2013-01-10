@@ -85,7 +85,7 @@ end
 
 -- decompress the file and return a handle to temporary uncompressed file
 function decompressed(path)
-	local fi = assert(io.open(path), 'rb')
+	local fi = assert(io.open(path, 'rb'))
 	local fo = io.tmpfile()
 
 	local z = inflate()
