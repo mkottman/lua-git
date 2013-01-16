@@ -42,7 +42,7 @@ local function git_connect(host)
 	return gitsocket
 end
 
-local function git_fetch(host, path, repo, head)
+local function git_fetch(host, path, repo, head, supress_progress)
 	local s = git_connect(host)
 	s:send('git-upload-pack '..path..'\0host='..host..'\0')
 
@@ -101,7 +101,7 @@ local function git_fetch(host, path, repo, head)
 			if cmd == 1 then
 				packfile:write(data)
 			elseif cmd == 2 then
-				io.write(data)
+				if not supress_progress then io.write(data) end
 			else
 				error(data)
 			end
@@ -125,11 +125,11 @@ local function git_fetch(host, path, repo, head)
 	return pack, wantedSha
 end
 
-function fetch(url, repo, head)
+function fetch(url, repo, head, supress_progress)
 	if repo then assert(getmetatable(repo) == Repo, "arg #2 is not a repository") end
 	url = urllib.parse(url)
 	if url.scheme == 'git' then
-		local pack, sha = git_fetch(url.host, url.path, repo, head)
+		local pack, sha = git_fetch(url.host, url.path, repo, head, supress_progress)
 		return pack, sha
 	else
 		error('unsupported scheme: '..url.scheme)
