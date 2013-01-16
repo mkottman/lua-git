@@ -152,8 +152,19 @@ function Repo:has_object(sha)
 end
 
 function Repo:checkout(sha, target)
+	if not target then target = self.workDir end
+	assert(target, 'target directory not specified')
+
 	local commit = self:commit(sha)
 	commit:checkout(target)
+
+	-- if the repo was checked out using the deepen command (one level of history only)
+	-- mark the commit's parent as shalow, that is it has no history
+	if self.isShallow then
+		local f = assert(io.open(self.dir .. '/shallow', "w"))
+		f:write(commit.parents[1], '\n')
+		f:close()
+	end
 end
 
 function create(dir)
@@ -162,7 +173,20 @@ function create(dir)
 	end
 	
 	util.make_dir(dir)
-	-- os.execute('mkdir -p '..dir)
+	util.make_dir(dir .. '/branches')
+	util.make_dir(dir .. '/hooks')
+	util.make_dir(dir .. '/info')	
+	util.make_dir(dir .. '/objects/info')
+	util.make_dir(dir .. '/objects/pack')
+	util.make_dir(dir .. '/refs/heads')
+	util.make_dir(dir .. '/refs/tags')
+	util.make_dir(dir .. '/refs/remotes')
+
+	do
+		local f = assert(io.open(dir .. "/HEAD", "w"))
+		f:write("ref: refs/heads/master\n")
+		f:close()
+	end
 
 	local refs = {}
 	local packs = {}
@@ -174,10 +198,13 @@ function create(dir)
 	}, Repo)
 end
 
--- opens a repository located in `dir`
+-- opens a repository located in working directory `dir` or directly a .git repo
 function open(dir)
+	local workDir = dir
 	if not dir:match('%.git.?$') then
 		dir = join_path(dir, '.git')
+	else
+		workDir = nil -- no working directory, working directly with repo
 	end
 
 	local refs = {}
@@ -209,6 +236,7 @@ function open(dir)
 
 	return setmetatable({
 		dir = dir,
+		workDir = workDir,
 		refs = refs,
 		packs = packs,
 	}, Repo)

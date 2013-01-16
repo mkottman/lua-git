@@ -114,7 +114,14 @@ local function git_fetch(host, path, repo, head)
 	local pack = Pack.open(packname)
 	if repo then
 		pack:unpack(repo)
+		repo.isShallow = true
+		if wantedSha then
+			local f = assert(io.open(repo.dir .. "/" .. head, "w"))
+			f:write(wantedSha)
+			f:close()
+		end
 	end
+
 	return pack, wantedSha
 end
 
