@@ -5,6 +5,9 @@ local lfs = require 'lfs'
 local Repo = git.repo.Repo
 local Pack = git.pack.Pack
 local join_path = git.util.join_path
+local parent_dir = git.util.parent_dir
+local make_dir = git.util.make_dir
+local correct_separators = git.util.correct_separators
 
 local assert, error, getmetatable, io, os, pairs, print, require, string, tonumber =
 	assert, error, getmetatable, io, os, pairs, print, require, string, tonumber
@@ -116,7 +119,9 @@ local function git_fetch(host, path, repo, head, supress_progress)
 		pack:unpack(repo)
 		repo.isShallow = true
 		if wantedSha then
-			local f = assert(io.open(repo.dir .. "/" .. head, "w"))
+			local headfile = correct_separators(join_path(repo.dir, head))
+			assert(make_dir(parent_dir(headfile)))
+			local f = assert(io.open(headfile, 'wb'))
 			f:write(wantedSha)
 			f:close()
 		end

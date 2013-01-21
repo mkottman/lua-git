@@ -10,6 +10,11 @@ local BUF_SIZE = 4096
 
 local dirsep = package.config:sub(1,1)
 
+-- replaces '/' path separators on Windows with the correct ones ('\\')
+function correct_separators(path)
+	return path:gsub('/', dirsep)
+end
+
 -- joins several path components into a single path, uses system-specific directory
 -- separator, cleans input, i.e. join_path('a/', 'b', 'c/') => 'a/b/c'
 function join_path(...)
@@ -58,7 +63,7 @@ end
 
 -- Return parent directory of the 'path' or nil if there's no parent directory.
 -- If 'path' is a path to file, return the directory the file is in.
-local function parent_dir(path)
+function parent_dir(path)
     path = remove_curr_dir_dots(path)
     path = remove_trailing(path)
 
