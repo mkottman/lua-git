@@ -3,7 +3,9 @@ package.cpath = package.cpath .. ';b/?.so'
 
 require 'git'
 
-local refs = git.protocol.remotes('git://github.com/LuaDist/lua.git')
+local repoUrl = arg[1] or 'git://github.com/mkottman/lua-git.git'
+
+local refs = git.protocol.remotes(repoUrl)
 for name, sha in pairs(refs) do
 	print(name, sha)
 end
