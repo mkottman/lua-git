@@ -21,6 +21,10 @@ module(...)
 Repo = {}
 Repo.__index = Repo
 
+-- retrieves an object identified by `sha` from the repository or its packs
+-- returns a file of the object object, the size of the object and its type
+-- the caller needs to close the file after use
+-- errors when the object does not exist
 function Repo:raw_object(sha)
 	-- first, look in 'objects' directory
 	-- first byte of sha is the directory, the rest is name of object file
@@ -50,12 +54,15 @@ function Repo:raw_object(sha)
 	end
 end
 
+--- Store a new object into the repository in `objects` directory.
+-- @param data A string containing the contents of the new file.
+-- @param len The length of the data.
+-- @param type One of 'commit', 'blob', 'tree', 'tag'
 function Repo:store_object(data, len, type)
 	local sha = readable_sha(object_sha(data, len, type))
 	local dir = sha:sub(1,2)
 	local file = sha:sub(3)
 	util.make_dir(join_path(self.dir, 'objects', dir))
-	--os.execute('mkdir -p '..join_path(self.dir, 'objects', dir))
 	local path = join_path(self.dir, 'objects', dir, file)
 	local fo = assert(io.open(path, 'wb'))
 	local header = type .. ' ' .. len .. '\0'
@@ -91,6 +98,7 @@ function Repo:commit(sha)
 			commit.message = {}
 		end
 	until false -- ends with break
+	f:close()
 
 	commit.message = table.concat(commit.message, '\n')
 
@@ -117,6 +125,8 @@ function Repo:tree(sha)
 		tree._entries[name] = { mode = mode, id = entry_sha, type = entry_type }
 	end
 
+	f:close()
+
 	return setmetatable(tree, objects.Tree)
 end
 
@@ -126,10 +136,11 @@ function Repo:blob(sha)
 	f:close() -- can be reopened in Blob:content()
 
 	assert(typ == 'blob', string.format('%s (%s) is not a blob', sha, typ))
-
-	local blob = { id = sha, len = len, repo = self, stored = true }
-
-	return setmetatable(blob, objects.Blob)
+	return setmetatable({ 
+		id = sha,
+		len = len,
+		repo = self,
+		stored = true }, objects.Blob)
 end
 
 function Repo:head()
@@ -218,6 +229,7 @@ function open(dir)
 				local f = assert(io.open(path), 'rb')
 				local ref = f:read()
 				refs[join_path(d, fn)] = ref
+				f:close()
 			end
 		end
 	end
@@ -235,6 +247,7 @@ function open(dir)
 		local src = head:read()
 		local HEAD = src:match('ref: (.-)$')
 		refs.HEAD = refs[HEAD]
+		head:close()
 	end
 
 	return setmetatable({

@@ -273,7 +273,7 @@ function Pack:construct_index(path)
 end
 
 function Pack.open(path)
-	local fp = assert(io.open(path, 'rb'))
+	local fp = assert(io.open(path, 'rb')) -- stays open
 	local fi = io.open((path:gsub('%.pack$', '.idx')), 'rb')
 	
 	-- read the pack header
@@ -299,6 +299,7 @@ function Pack.open(path)
 	-- read the index
 	if fi then
 		pack:parse_index(fi)
+		fi:close()
 	else
 		pack:construct_index(path)
 	end
