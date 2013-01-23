@@ -101,6 +101,7 @@ function decompressed(path)
 			assert(fo:write(data))
 		else print('!!!', data) end
 	until not str
+	fi:close()
 	fo:flush()
 	fo:seek('set')
 	return fo
