@@ -161,9 +161,12 @@ function Repo:checkout(sha, target)
 	-- if the repo was checked out using the deepen command (one level of history only)
 	-- mark the commit's parent as shalow, that is it has no history
 	if self.isShallow then
-		local f = assert(io.open(self.dir .. '/shallow', "w"))
-		f:write(commit.parents[1], '\n')
-		f:close()
+		-- if it has a parent, mark it shallow
+		if commit.parents[1] then
+			local f = assert(io.open(self.dir .. '/shallow', "w"))
+			f:write(commit.parents[1], '\n')
+			f:close()
+		end
 	end
 end
 
