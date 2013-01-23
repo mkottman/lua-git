@@ -12,6 +12,8 @@ local correct_separators = git.util.correct_separators
 local assert, error, getmetatable, io, os, pairs, print, require, string, tonumber =
 	assert, error, getmetatable, io, os, pairs, print, require, string, tonumber
 
+local _VERSION, newproxy = _VERSION, newproxy
+
 module(...)
 
 local GIT_PORT = 9418
@@ -43,6 +45,19 @@ local function git_connect(host)
 	end
 
 	return gitsocket
+end
+
+local function addFinalizer(object, finalizer)
+	if _VERSION <= "Lua 5.1" then
+		local gc = newproxy(true)
+		getmetatable(gc).__gc = finalizer
+		object.__gc = gc
+	else
+		local mt = getmetatable(object)
+		if mt then mt.__gc = finalizer
+		else setmetatable(object, {__gc = finalizer})
+		end
+	end
 end
 
 local function git_fetch(host, path, repo, head, supress_progress)
@@ -126,6 +141,11 @@ local function git_fetch(host, path, repo, head, supress_progress)
 			f:close()
 		end
 	end
+
+	addFinalizer(pack, function()
+		packfile:close()
+		os.remove(packname)
+	end)
 
 	return pack, wantedSha
 end
