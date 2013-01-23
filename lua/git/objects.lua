@@ -6,6 +6,8 @@ local join_path = git.util.join_path
 
 local require = require
 
+local isPosix = package.config:sub(1,1) == '/'
+
 module(...)
 
 Commit = {}
@@ -36,6 +38,7 @@ function Tree:entries()
 				object = self.repo:tree(entry.id)
 			elseif entry.type == 'blob' then
 				object = self.repo:blob(entry.id)
+				object.mode = entry.mode
 			elseif entry.type == 'commit' then
 				-- this is possibly a commit in a submodule, 
 				-- do not retrieve it from current repo
@@ -86,6 +89,11 @@ function Tree:checkoutTo(path)
 			local out = assert(io.open(entry_path, 'wb'))
 			out:write(entry:content())
 			out:close()
+			if isPosix then
+				local mode = entry.mode:sub(-3,-1) -- fixme: is this ok?
+				local cmd = 'chmod '..mode..' "'..entry_path..'"'
+				os.execute(cmd)
+			end
 		elseif type == 'commit' then
 			-- this is a submodule referencing a commit,
 			-- make a directory for it
