@@ -71,8 +71,24 @@ function Repo:store_object(data, len, type)
 	fo:close()
 end
 
+local function resolvetag(f)
+	local tag
+	local line = f:read()
+	while line do
+		tag = line:match('^object (%x+)$')
+		if tag then break end
+		line = f:read()
+	end
+	f:close()
+	return tag
+end
+
 function Repo:commit(sha)
 	local f, len, typ = self:raw_object(sha)
+	while typ == 'tag' do
+		sha = assert(resolvetag(f), 'could not parse tag for '..readable_sha(sha))
+		f, len, typ = self:raw_object(sha)
+	end
 	assert(typ == 'commit', string.format('%s (%s) is not a commit', sha, typ))
 
 	local commit = { id = sha, repo = self, stored = true, parents = {} }
