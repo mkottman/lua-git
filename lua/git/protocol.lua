@@ -143,7 +143,6 @@ local function git_fetch(host, path, repo, head, supress_progress)
 	end
 
 	addFinalizer(pack, function()
-		packfile:close()
 		os.remove(packname)
 	end)
 
