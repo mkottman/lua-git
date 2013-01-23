@@ -141,6 +141,8 @@ local function patch_object(base, delta, base_type)
 		cmd = df:read(1)
 	end
 
+	df:close()
+
 	result = concat(result)
 	assert(#result == result_size, fmt('#result(%d) ~= result_size(%d)', #result, result_size))
 	return result, result_size, base_type
