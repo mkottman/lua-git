@@ -96,7 +96,7 @@ end
 -- returns a patched object from string `base` according to `delta` data
 local function patch_object(base, delta, base_type)
 	-- insert delta codes into temporary file
-	local df = io.tmpfile()
+	local df = assert(io.tmpfile())
 	df:write(delta)
 	df:seek('set', 0)
 
