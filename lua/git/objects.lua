@@ -6,7 +6,7 @@ local join_path = git.util.join_path
 
 local require = require
 
-local isPosix = package.config:sub(1,1) == '/'
+local isPosix = package.config:sub(1,1) == '/' -- wild guess
 
 module(...)
 
@@ -72,6 +72,7 @@ function Tree:walk(func, path)
 		for name, type, entry in tree:entries() do
 			local entry_path = join_path(path, name)
 			func(entry, entry_path, type)
+
 			if type == "tree" then
 				walk(entry, entry_path)
 			end
@@ -111,6 +112,7 @@ function Blob:content()
 	if self.stored then
 		local f = self.repo:raw_object(self.id)
 		local ret = f:read('*a')
+		f:close()
 		return ret
 	else
 		return self.data
