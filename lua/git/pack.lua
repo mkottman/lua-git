@@ -16,6 +16,7 @@ local from_hex = git.util.from_hex
 local object_sha = git.util.object_sha
 local binary_sha = git.util.binary_sha
 local readable_sha = git.util.readable_sha
+local tmpfile = git.util.tmpfile
 
 module(...)
 
@@ -96,7 +97,7 @@ end
 -- returns a patched object from string `base` according to `delta` data
 local function patch_object(base, delta, base_type)
 	-- insert delta codes into temporary file
-	local df = assert(io.tmpfile())
+	local df = assert(tmpfile())
 	df:write(delta)
 	df:seek('set', 0)
 
@@ -201,7 +202,7 @@ function Pack:get_object(sha)
 
 	local data, len, type = self:read_object(offset)
 	print(readable_sha(sha), len, type, data)
-	local f = io.tmpfile()
+	local f = tmpfile()
 	f:write(data)
 	f:seek('set', 0)
 
@@ -274,9 +275,12 @@ function Pack:construct_index(path)
 	self.index = index
 end
 
+function Pack:close()
+	self.pack_file:close()
+end
+
 function Pack.open(path)
 	local fp = assert(io.open(path, 'rb')) -- stays open
-	local fi = io.open((path:gsub('%.pack$', '.idx')), 'rb')
 	
 	-- read the pack header
 	local head = fp:read(4)
@@ -299,6 +303,7 @@ function Pack.open(path)
 	end
 
 	-- read the index
+	local fi = io.open((path:gsub('%.pack$', '.idx')), 'rb')
 	if fi then
 		pack:parse_index(fi)
 		fi:close()

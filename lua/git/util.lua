@@ -88,10 +88,44 @@ function make_dir(path)
     end
 end
 
+
+local iswindows = package.config:sub(1,1) == '\\'
+ 
+-- a working implementation of io.tmpfile() for Windows
+function tmpfile()
+	if iswindows then -- special Windows logic
+		local temp = os.getenv('TEMP')
+		local fn = 'lua' .. os.tmpname():sub(2)
+		local path = join_path(temp, fn)
+		local f, err = io.open(path, 'wb+')
+		if not f then
+			return f, err
+		end
+
+		-- make a proxy object with custom close method
+		-- to delete the file on close
+		local ret = setmetatable({
+			close = function()
+				f:close()
+				os.remove(path)
+			end
+		}, {
+			__index = function(t, k)
+				return function(_, ...)
+					return f[k](f, ...)
+				end
+			end
+		})
+		return ret
+	else
+		return io.tmpfile()
+	end
+end
+
 -- decompress the file and return a handle to temporary uncompressed file
 function decompressed(path)
 	local fi = assert(io.open(path, 'rb'))
-	local fo = assert(io.tmpfile())
+	local fo = assert(tmpfile())
 
 	local z = inflate()
 	repeat
@@ -156,4 +190,4 @@ end
 function deflate(data)
 	local c = deflate()
 	return c(data, "finish")
-end 
+end

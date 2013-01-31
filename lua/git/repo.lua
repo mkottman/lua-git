@@ -197,6 +197,12 @@ function Repo:checkout(sha, target)
 	end
 end
 
+function Repo:close()
+	for _, pack in ipairs(self.packs) do
+		pack:close()
+	end
+end	
+
 function create(dir)
 	if not dir:match('%.git.?$') then
 		dir = join_path(dir, '.git')
