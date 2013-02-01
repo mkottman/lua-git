@@ -29,69 +29,103 @@ end
 -- Return the path with the all occurences of '/.' or '\.' (representing
 -- the current directory) removed.
 local function remove_curr_dir_dots(path)
-    while path:match(dirsep .. "%." .. dirsep) do             -- match("/%./")
-        path = path:gsub(dirsep .. "%." .. dirsep, dirsep)    -- gsub("/%./", "/")
-    end
-    return path:gsub(dirsep .. "%.$", "")                     -- gsub("/%.$", "")
+	while path:match(dirsep .. "%." .. dirsep) do             -- match("/%./")
+		path = path:gsub(dirsep .. "%." .. dirsep, dirsep)    -- gsub("/%./", "/")
+	end
+	return path:gsub(dirsep .. "%.$", "")                     -- gsub("/%.$", "")
 end
 
 -- Return whether the path is a root.
 local function is_root(path)
-    return path:find("^[%u%U.]?:?[/\\]$")
+	return path:find("^[%u%U.]?:?[/\\]$")
 end
 
 -- Return the path with the unnecessary trailing separator removed.
 local function remove_trailing(path)
-    if path:sub(-1) == dirsep and not is_root(path) then path = path:sub(1,-2) end
-    return path
+	if path:sub(-1) == dirsep and not is_root(path) then path = path:sub(1,-2) end
+	return path
 end
 
 -- Extract file or directory name from its path.
 local function extract_name(path)
-    if is_root(path) then return path end
+	if is_root(path) then return path end
 
-    path = remove_trailing(path)
-    path = path:gsub("^.*" .. dirsep, "")
-    return path
+	path = remove_trailing(path)
+	path = path:gsub("^.*" .. dirsep, "")
+	return path
 end
 
 -- Return the string 'str', with all magic (pattern) characters escaped.
 local function escape_magic(str)
-    local escaped = str:gsub('[%-%.%+%[%]%(%)%^%%%?%*%^%$]','%%%1')
-    return escaped
+	local escaped = str:gsub('[%-%.%+%[%]%(%)%^%%%?%*%^%$]','%%%1')
+	return escaped
 end
 
 -- Return parent directory of the 'path' or nil if there's no parent directory.
 -- If 'path' is a path to file, return the directory the file is in.
 function parent_dir(path)
-    path = remove_curr_dir_dots(path)
-    path = remove_trailing(path)
+	path = remove_curr_dir_dots(path)
+	path = remove_trailing(path)
 
-    local dir = path:gsub(escape_magic(extract_name(path)) .. "$", "")
-    if dir == "" then
-        return nil
-    else
-        return remove_trailing(dir)
-    end
+	local dir = path:gsub(escape_magic(extract_name(path)) .. "$", "")
+	if dir == "" then
+		return nil
+	else
+		return remove_trailing(dir)
+	end
 end
 
 -- Make a new directory, making also all of its parent directories that doesn't exist.
 function make_dir(path)
-    if lfs.attributes(path) then
-        return true
-    else
-        local par_dir = parent_dir(path)
-        if par_dir then
-            assert(make_dir(par_dir))
-        end
-        return lfs.mkdir(path)
-    end
+	if lfs.attributes(path) then
+		return true
+	else
+		local par_dir = parent_dir(path)
+		if par_dir then
+			assert(make_dir(par_dir))
+		end
+		return lfs.mkdir(path)
+	end
+end
+
+
+local iswindows = package.config:sub(1,1) == '\\'
+ 
+-- a working implementation of io.tmpfile() for Windows
+function tmpfile()
+	if iswindows then -- special Windows logic
+		local temp = os.getenv('TEMP')
+		local fn = 'lua' .. os.tmpname():sub(2)
+		local path = join_path(temp, fn)
+		local f, err = io.open(path, 'wb+')
+		if not f then
+			return f, err
+		end
+
+		-- make a proxy object with custom close method
+		-- to delete the file on close
+		local ret = setmetatable({
+			close = function()
+				f:close()
+				os.remove(path)
+			end
+		}, {
+			__index = function(t, k)
+				return function(_, ...)
+					return f[k](f, ...)
+				end
+			end
+		})
+		return ret
+	else
+		return io.tmpfile()
+	end
 end
 
 -- decompress the file and return a handle to temporary uncompressed file
 function decompressed(path)
 	local fi = assert(io.open(path, 'rb'))
-	local fo = assert(io.tmpfile())
+	local fo = assert(tmpfile())
 
 	local z = inflate()
 	repeat
@@ -156,4 +190,4 @@ end
 function deflate(data)
 	local c = deflate()
 	return c(data, "finish")
-end 
+end
