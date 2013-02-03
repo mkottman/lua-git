@@ -1,0 +1,29 @@
+type = "x86"
+arch = "Windows"
+author = "Michal Kottman"
+depends = {
+[[lua ~> 5.1]],
+[[luasocket >= 2.0.0]],
+[[luafilesystem >= 1.6]],
+[[zlib >= 1.2]],
+}
+
+desc = "A library to access Git repositories and its objects (files, commits) in Lua"
+version = "0.4"
+maintainer = "Michal Kottman"
+files = {
+Runtime = {
+[[lib\lua\git\core.dll]],
+[[lib\lua\git.lua]],
+[[lib\lua\git\objects.lua]],
+[[lib\lua\git\pack.lua]],
+[[lib\lua\git\protocol.lua]],
+[[lib\lua\git\repo.lua]],
+[[lib\lua\git\util.lua]],
+}
+,
+}
+
+license = "MIT/X11"
+name = "lua-git"
+url = "https://github.com/mkottman/lua-git"
