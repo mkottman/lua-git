@@ -1,8 +1,8 @@
 local io = io
 local core = require 'git.core'
 
-local assert, pcall, print, setmetatable =
-	assert, pcall, print, setmetatable
+local assert, pcall, print, select, setmetatable, string, type, unpack =
+	assert, pcall, print, select, setmetatable, string, type, unpack
 
 local ord = string.byte
 local fmt = string.format
@@ -17,6 +17,7 @@ local object_sha = git.util.object_sha
 local binary_sha = git.util.binary_sha
 local readable_sha = git.util.readable_sha
 local tmpfile = git.util.tmpfile
+local reader = git.util.reader
 
 module(...)
 
@@ -97,9 +98,7 @@ end
 -- returns a patched object from string `base` according to `delta` data
 local function patch_object(base, delta, base_type)
 	-- insert delta codes into temporary file
-	local df = assert(tmpfile())
-	df:write(delta)
-	df:seek('set', 0)
+	local df = reader(delta)
 
 	-- retrieve original and result size (for checks)
 	local orig_size = delta_size(df)

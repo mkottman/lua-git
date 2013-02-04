@@ -1,7 +1,7 @@
 local util = require 'git.util'
 
-local assert, next, io, print, os, type, string =
-	assert, next, io, print, os, type, string
+local assert, next, io, print, os, type, string, pairs, tostring =
+	assert, next, io, print, os, type, string, pairs, tostring
 local join_path = git.util.join_path
 
 local require = require
@@ -111,7 +111,7 @@ Blob.__index = Blob
 function Blob:content()
 	if self.stored then
 		local f = self.repo:raw_object(self.id)
-		local ret = f:read('*a')
+		local ret = f:read('*a') or ""
 		f:close()
 		return ret
 	else

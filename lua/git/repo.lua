@@ -22,8 +22,8 @@ Repo = {}
 Repo.__index = Repo
 
 -- retrieves an object identified by `sha` from the repository or its packs
--- returns a file of the object object, the size of the object and its type
--- the caller needs to close the file after use
+-- returns a file-like object (supports 'read', 'seek' and 'close'), the size
+-- of the object and its type
 -- errors when the object does not exist
 function Repo:raw_object(sha)
 	-- first, look in 'objects' directory

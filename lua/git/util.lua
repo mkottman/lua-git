@@ -89,56 +89,96 @@ function make_dir(path)
 end
 
 
-local iswindows = package.config:sub(1,1) == '\\'
+-- Reader class
+-- adapted from Penlight: https://raw.github.com/stevedonovan/Penlight/master/lua/pl/stringio.lua
  
--- a working implementation of io.tmpfile() for Windows
-function tmpfile()
-	if iswindows then -- special Windows logic
-		local temp = os.getenv('TEMP')
-		local fn = 'lua' .. os.tmpname():sub(2)
-		local path = join_path(temp, fn)
-		local f, err = io.open(path, 'wb+')
-		if not f then
-			return f, err
+local SR = {}
+SR.__index = SR
+
+function SR:_read(fmt)
+    local i,str = self.i,self.str
+    local sz = #str
+    if i > sz then return nil, "past end of file" end
+    local res
+    if fmt == '*l' or fmt == '*L' then
+        local idx = str:find('\n',i) or (sz+1)
+        res = str:sub(i,fmt == '*l' and idx-1 or idx)
+        self.i = idx+1
+    elseif fmt == '*a' then
+        res = str:sub(i)
+        self.i = sz+1
+    elseif fmt == '*n' then
+        local _,i2,i2,idx
+        _,idx = str:find ('%s*%d+',i)
+        _,i2 = str:find ('^%.%d+',idx+1)
+        if i2 then idx = i2 end
+        _,i2 = str:find ('^[eE][%+%-]*%d+',idx+1)
+        if i2 then idx = i2 end
+        local val = str:sub(i,idx)
+        res = tonumber(val)
+        self.i = idx+1
+    elseif type(fmt) == 'number' then
+        res = str:sub(i,i+fmt-1)
+        self.i = i + fmt
+    else
+        error("bad read format",2)
+    end
+    return res
 		end
 
-		-- make a proxy object with custom close method
-		-- to delete the file on close
-		local ret = setmetatable({
-			close = function()
-				f:close()
-				os.remove(path)
+function SR:read(...)
+    if select('#',...) == 0 then
+        return self:_read('*l')
+    else
+        local res, fmts = {},{...}
+        for i = 1, #fmts do
+            res[i] = self:_read(fmts[i])
 			end
-		}, {
-			__index = function(t, k)
-				return function(_, ...)
-					return f[k](f, ...)
+        return unpack(res)
 				end
 			end
-		})
-		return ret
-	else
-		return io.tmpfile()
+
+function SR:seek(whence,offset)
+    local base
+    whence = whence or 'cur'
+    offset = offset or 0
+    if whence == 'set' then
+        base = 1
+    elseif whence == 'cur' then
+        base = self.i
+    elseif whence == 'end' then
+        base = #self.str
 	end
+    self.i = base + offset
+    return self.i
 end
+
+function SR:close() -- for compatibility only
+end
+
+--- create a file-like object for reading from a given string.
+-- @param s The input string.
+function reader(s)
+    return setmetatable({str=s,i=1},SR)
+end
+
 
 -- decompress the file and return a handle to temporary uncompressed file
 function decompressed(path)
 	local fi = assert(io.open(path, 'rb'))
-	local fo = assert(tmpfile())
+	local result = {}
 
 	local z = inflate()
 	repeat
 		local str = fi:read(BUF_SIZE)
 		local data = z(str)
 		if type(data) == 'string' then
-			assert(fo:write(data))
+			result[#result+1] = data
 		else print('!!!', data) end
 	until not str
 	fi:close()
-	fo:flush()
-	fo:seek('set')
-	return fo
+
+	return reader(table.concat(result))
 end
 
 -- reads until the byte \0, consumes it and returns the string up to the \0
