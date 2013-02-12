@@ -66,7 +66,7 @@ local function tmpname()
 	if not isPosix then
 		local prefix = os.getenv("TEMP")
 		local name = os.tmpname()
-		return util.join_path(prefix, name)
+		return join_path(prefix, name)
 	else
 		return os.tmpname()
 	end
