@@ -16,7 +16,6 @@ local from_hex = git.util.from_hex
 local object_sha = git.util.object_sha
 local binary_sha = git.util.binary_sha
 local readable_sha = git.util.readable_sha
-local tmpfile = git.util.tmpfile
 local reader = git.util.reader
 
 module(...)
@@ -200,10 +199,7 @@ function Pack:get_object(sha)
 	end
 
 	local data, len, type = self:read_object(offset)
-	print(readable_sha(sha), len, type, data)
-	local f = tmpfile()
-	f:write(data)
-	f:seek('set', 0)
+	local f = reader(data)
 
 	return f, len, types[type]
 end

@@ -14,6 +14,8 @@ local assert, error, getmetatable, io, os, pairs, print, require, string, tonumb
 
 local _VERSION, newproxy = _VERSION, newproxy
 
+local isPosix = package.config:sub(1,1) == '/'
+
 module(...)
 
 local GIT_PORT = 9418
@@ -57,6 +59,16 @@ local function addFinalizer(object, finalizer)
 		if mt then mt.__gc = finalizer
 		else setmetatable(object, {__gc = finalizer})
 		end
+	end
+end
+
+local function tmpname()
+	if not isPosix then
+		local prefix = os.getenv("TEMP")
+		local name = os.tmpname()
+		return util.join_path(prefix, name)
+	else
+		return os.tmpname()
 	end
 end
 
@@ -108,7 +120,7 @@ local function git_fetch(host, path, repo, head, supress_progress)
 	
 	assert(s:receive() == "NAK\n")
 	
-	local packname = os.tmpname() .. '.pack'
+	local packname = tmpname() .. '.pack'
 	local packfile = assert(io.open(packname, 'wb'))
 	repeat
 		local got = s:receive()
